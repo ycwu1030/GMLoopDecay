@@ -1,5 +1,5 @@
-#ifndef THDMParameter_H
-#define THDMParameter_H
+#ifndef GMParameter_H
+#define GMParameter_H
 
 #include <cmath>
 
