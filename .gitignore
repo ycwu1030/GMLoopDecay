@@ -1,0 +1,6 @@
+.DS_Store
+formula_datas
+*.x
+*.o
+*~
+*.dat
