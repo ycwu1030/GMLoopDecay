@@ -59,12 +59,17 @@ public:
     void SetModel(double MH, double MH3, double MH5, double M2);
     double GetGammaHVV(PID Mother, PID P1, PID P2);
     double GetGammaHtot(PID Mother);
+
+    double GetGammaHVVEFT(PID Mother, PID P1, PID P2);
+    double GetGammaHtotEFT(PID Mother);
 private: 
     GMModel _Mod;
     void ResettingGammas();
     double GammaHVV[NChannel];
+    double GammaHVVEFT[NChannel];
     int ToChannelID(PID Mother, PID P1, PID P2);
     void CalcGammaHVV(PID Mother, PID P1, PID P2);
+    void CalcGammaHVVEFT(PID Mother, PID P1, PID P2);
     void GetMotherMass(PID Mother, double &mass);
     void GetVectorMassWidth(PID P1, double &mass, double &Gamma);
     enum ChannelID

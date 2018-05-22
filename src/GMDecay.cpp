@@ -496,6 +496,36 @@ void GMDecay::CalcGammaHVV(PID Mother, PID P1, PID P2)
     }
 }
 
+void GMDecay::CalcGammaHVVEFT(PID Mother, PID P1, PID P2)
+{
+    int channel = ToChannelID(Mother, P1, P2);
+    if (GammaHVVEFT[channel] > 0 || channel == UNKOWN)
+    {
+        return;
+    }
+    SFunc SHVV = GM::SH50AA; // Always using SH50AA
+    double ratio = GetSFuncEFTRatio(Mother,P1,P2);
+    SFunc STilde = GM::NOIMPLEMENTED;
+
+    double eta = P1==P2?2:1;
+    double m1, m2, m3, ga2, ga3;
+    GetMotherMass(Mother,m1);
+    GetVectorMassWidth(P1,m2,ga2);
+    GetVectorMassWidth(P2,m3,ga3);
+    if ((ga3 < 0 && ga2 > 0)||(ga3 < 0 && ga2 < 0))
+    {
+        GammaHVVEFT[channel] = ratio*ratio*GammaHVAOFF(m1,m2,ga2,_Mod,SHVV,STilde,eta);
+    }
+    else if (ga2 < 0 && ga3 > 0)
+    {
+        GammaHVVEFT[channel] = ratio*ratio*GammaHVAOFF(m1,m3,ga3,_Mod,SHVV,STilde,eta);
+    }
+    else
+    {
+        GammaHVVEFT[channel] = ratio*ratio*GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+    }
+}
+
 double GMDecay::GetGammaHVV(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
@@ -508,6 +538,20 @@ double GMDecay::GetGammaHVV(PID Mother, PID P1, PID P2)
         CalcGammaHVV(Mother, P1, P2);
     }
     return GammaHVV[channel];
+}
+
+double GMDecay::GetGammaHVVEFT(PID Mother, PID P1, PID P2)
+{
+    int channel = ToChannelID(Mother, P1, P2);
+    if (GammaHVVEFT[channel] > 0 || channel == UNKOWN)
+    {
+        return GammaHVVEFT[channel];
+    }
+    else
+    {
+        CalcGammaHVVEFT(Mother, P1, P2);
+    }
+    return GammaHVVEFT[channel];
 }
 
 double GMDecay::GetGammaHtot(PID Mother)
@@ -547,6 +591,47 @@ double GMDecay::GetGammaHtot(PID Mother)
     else if (Mother == H5pp)
     {
         Gammatot += GetGammaHVV(H5pp,W,W);
+    }
+    return Gammatot;
+}
+
+double GMDecay::GetGammaHtotEFT(PID Mother)
+{
+    double Gammatot=0.0;
+    if (Mother == H)
+    {
+        Gammatot += GetGammaHVVEFT(H,A,A);
+        Gammatot += GetGammaHVVEFT(H,W,W);
+        Gammatot += GetGammaHVVEFT(H,Z,A);
+        Gammatot += GetGammaHVVEFT(H,Z,Z);
+    }
+    else if (Mother == H30)
+    {
+        Gammatot += GetGammaHVVEFT(H30,A,A);
+        Gammatot += GetGammaHVVEFT(H30,W,W);
+        Gammatot += GetGammaHVVEFT(H30,Z,A);
+        Gammatot += GetGammaHVVEFT(H30,Z,Z);
+    }
+    else if (Mother == H50)
+    {
+        Gammatot += GetGammaHVVEFT(H50,A,A);
+        Gammatot += GetGammaHVVEFT(H50,W,W);
+        Gammatot += GetGammaHVVEFT(H50,Z,A);
+        Gammatot += GetGammaHVVEFT(H50,Z,Z);
+    }
+    else if (Mother == H3p)
+    {
+        Gammatot += GetGammaHVVEFT(H3p,W,A);
+        Gammatot += GetGammaHVVEFT(H3p,W,Z);
+    }
+    else if (Mother == H5p)
+    {
+        Gammatot += GetGammaHVVEFT(H5p,W,A);
+        Gammatot += GetGammaHVVEFT(H5p,W,Z);
+    }
+    else if (Mother == H5pp)
+    {
+        Gammatot += GetGammaHVVEFT(H5pp,W,W);
     }
     return Gammatot;
 }

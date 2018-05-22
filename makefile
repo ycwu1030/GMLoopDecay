@@ -1,6 +1,5 @@
 
 LT = /Users/ycwu/Library/Mathematica/Applications/LoopTools/x86_64-Darwin/lib
-#LT = /Users/mac/work/LoopTools/x86_64-Darwin/lib
 
 SRCDIR := src
 INCDIR := include
@@ -9,21 +8,23 @@ CXX = $(LT)/../bin/f++
 FFLAG = -I$(LT)/../include -I$(INCDIR) `gsl-config --cflags`
 FLIBS = -L$(LT) -looptools `gsl-config --libs`
 
+INC = $(wildcard $(INCDIR)/*.h)
 SRC = $(wildcard $(SRCDIR)/*.cpp)
 OBJ = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRC))
 
-all: GMFormFactor.x
+.PRECIOUS: $(OBJ)
+.PHONY: clean all MKOBJDIR
 
-%.x:%.cpp $(OBJ)
+all: MKOBJDIR GMFormFactor.x
+
+%.x:%.cpp $(OBJ) 
 	$(CXX) $(FFLAG) -o $@ $< $(OBJ) $(FLIBS)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp $(INC)
+	$(CXX) $(FFLAG) -c $< -o $@
 
 MKOBJDIR:
 	@mkdir -p $(OBJDIR)
-
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp MKOBJDIR
-	$(CXX) $(FFLAG) -c $< -o $@
-
-.PHONY: clean
 
 clean:
 	rm -f *.x

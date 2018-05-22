@@ -126,6 +126,131 @@ SFunc GetSFunc(PID Mother, PID P1, PID P2)
   }
 }
 
+double GetSFuncEFTRatio(PID Mother, PID P1, PID P2)
+{
+  if (Mother == H)
+  {
+    if (P1 == A && P2 == A)
+    {
+      return 1.0/(sqrt(2));
+    }
+    else if (P1 == W && P2 == W)
+    {
+      return 0;
+    }
+    else if ( (P1 == Z && P2 == A) || (P1 == A && P2 == Z) )
+    {
+      return (1.0-2.0*sw*sw)/(2.0*sqrt(2)*sw*cw);
+    }
+    else if ( P1 == Z && P2 == Z)
+    {
+      return (-1.0/sqrt(2));
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired channel, using HZZ instead"<<std::endl;
+      return (-1.0/sqrt(2));
+    }
+  }
+  else if (Mother == H30)
+  {
+    if (P1 == A && P2 == A)
+    {
+      return 0;
+    }
+    else if (P1 == W && P2 == W)
+    {
+      return 0;
+    }
+    else if ( (P1 == Z && P2 == A) || (P1 == A && P2 == Z) )
+    {
+      return 0;
+    }
+    else if ( P1 == Z && P2 == Z)
+    {
+      return 0;
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired channel, using H30ZZ instead"<<std::endl;
+      return 0;
+    }
+  }
+  else if (Mother == H50)
+  {
+    if (P1 == A && P2 == A)
+    {
+      return 1.0;
+    }
+    else if (P1 == W && P2 == W)
+    {
+      return 0;
+    }
+    else if ( (P1 == Z && P2 == A) || (P1 == A && P2 == Z) )
+    {
+      return ((1.0-2.0*sw*sw)/(2*sw*cw));
+    }
+    else if ( P1 == Z && P2 == Z)
+    {
+      return -1.0;
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired channel, using H50ZZ instead"<<std::endl;
+      return -1.0;
+    }
+  }
+  else if (Mother == H3p)
+  {
+    if ((P1 == W && P2 == A) || (P1 == A && P2 == W))
+    {
+      return (sqrt(3)/(4.0*cw));
+    }
+    else if ((P1 == W && P2 == Z) || (P1 == Z && P2 == W))
+    {
+      return (-sqrt(3)/(4.0*cw));
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired channel, using H3pWZ instead"<<std::endl;
+      return (-sqrt(3)/(4.0*cw));
+    }
+  }
+  else if (Mother == H5p)
+  {
+    if ((P1 == W && P2 == A) || (P1 == A && P2 == W))
+    {
+      return (-sqrt(3)/(4.0*cw));
+    }
+    else if ((P1 == W && P2 == Z) || (P1 == Z && P2 == W))
+    {
+      return (sqrt(3)/(4.0*cw));
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired channel, using H5pWZ instead"<<std::endl;
+      return (sqrt(3)/(4.0*cw));
+    }
+  }
+  else if (Mother == H5pp)
+  {
+    if (P1 == W && P2 == W)
+    {
+      return 0;
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired channel, using H5ppWW instead"<<std::endl;
+      return 0;
+    }
+  }
+  else
+  {
+    std::cout<<"Warning: Didn't Find the desired channel, using HWW instead"<<std::endl;
+    return 0;
+  }
+}
+
 namespace GM{
 ComplexType NOIMPLEMENTED(double MH2, double MH32, double MH52, double M2coeff, double m12, double m22, double m32)
 {
