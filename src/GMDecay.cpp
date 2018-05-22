@@ -291,8 +291,10 @@ void GMDecay::ResettingGammas()
     for (int i = 0; i < NChannel; ++i)
     {
         GammaHVV[i] = -1;
+        GammaHVVEFT[i] = -1;
     }
     GammaHVV[NChannel-1] = 0;
+    GammaHVVEFT[NChannel-1] = 0;
 }
 
 int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
