@@ -204,7 +204,7 @@ double GetSFuncEFTRatio(PID Mother, PID P1, PID P2)
   {
     if ((P1 == W && P2 == A) || (P1 == A && P2 == W))
     {
-      return (sqrt(3)/(4.0*cw));
+      return (sqrt(3)/(4.0*sw));
     }
     else if ((P1 == W && P2 == Z) || (P1 == Z && P2 == W))
     {
@@ -220,7 +220,7 @@ double GetSFuncEFTRatio(PID Mother, PID P1, PID P2)
   {
     if ((P1 == W && P2 == A) || (P1 == A && P2 == W))
     {
-      return (-sqrt(3)/(4.0*cw));
+      return (-sqrt(3)/(4.0*sw));
     }
     else if ((P1 == W && P2 == Z) || (P1 == Z && P2 == W))
     {
