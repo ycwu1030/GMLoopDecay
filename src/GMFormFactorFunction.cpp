@@ -251,6 +251,59 @@ double GetSFuncEFTRatio(PID Mother, PID P1, PID P2)
   }
 }
 
+double GetHHVCoupling(PID Mother, PID P1, PID P2)
+{
+    if (P2 == Z)
+    {
+      if ((Mother == H && P1 == H30) || (Mother == H30 && P1 == H))
+      {
+        return sqrt(2.0/3.0)*ee/(sw*cw);
+      }
+      else if ((Mother == H30 && P1 == H50) || (Mother == H50 && P1 == H30))
+      {
+        return sqrt(1.0/3.0)*ee/(sw*cw);
+      }
+      else if ((Mother == H3p && P1 == H5p) || (Mother == H5p && P1 == H3p))
+      {
+        return ee/(2*sw*cw);
+      }
+      else
+      {
+        std::cout<<"Warning: Didn't Find the desired HHV channel, just return 0"<<std::endl;
+        return 0;
+      }
+    }
+    else if (P2 == W)
+    {
+      if ((Mother == H && P1 == H3p) || (Mother == H3p && P1 == H))
+      {
+        return sqrt(2.0/3.0)*ee/sw;
+      }
+      else if ((Mother == H3p && P1 == H50) || (Mother == H50 && P1 == H3p))
+      {
+        return 1.0/2.0/sqrt(3)*ee/sw;
+      }
+      else if ((Mother == H30 && P1 == H5p) || (Mother == H5p && P1 == H30))
+      {
+        return 1.0/2.0*ee/sw;
+      }
+      else if ((Mother == H3p && P1 == H5pp) || (Mother == H5pp && P1 == H3p))
+      {
+        return 1.0/sqrt(2.0)*ee/sw;
+      }
+      else
+      {
+        std::cout<<"Warning: Didn't Find the desired HHV channel, just return 0"<<std::endl;
+        return 0;
+      }
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired HHV channel, just return 0"<<std::endl;
+      return 0;
+    }
+}
+
 namespace GM{
 ComplexType NOIMPLEMENTED(double MH2, double MH32, double MH52, double M2coeff, double m12, double m22, double m32)
 {

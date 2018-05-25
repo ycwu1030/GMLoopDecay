@@ -31,6 +31,7 @@
 #define AlfasMZ .1184
 #define Alfas 0.0
 #define Alfashgg 0.1184
+#define ee (sqrt(Alfa*4*PI))
 
 #define v 246.2
 #define v2 (v*v)
@@ -72,6 +73,7 @@
 #define Cot(i) (1/tan(i))
 
 #define OFFSHELLSTEPS 50
+#define GSLCALLS 2000
 
 typedef struct
 {

@@ -6,6 +6,7 @@
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_monte.h>
 #include <gsl/gsl_monte_vegas.h>
+#include <gsl/gsl_monte_miser.h>
 
 typedef struct
 {
@@ -21,11 +22,25 @@ typedef struct
 	GMModel Mod;
 } GMModel_VEGAS;
 
+typedef struct
+{
+    double MH1;
+    double MH2;
+    double GAH2;
+    double MV;
+    double GAV;
+    double CHHV;
+} GMModel_HHV_VEGAS;
+
 double lambda(double a, double b, double c);
 
 double GammaHVV(double MH, double MV1, double MV2, GMModel &Mod, SFunc S, SFunc Stilde, double eta);
 
 double GammaHVV_VEGAS(double *Q2, size_t dim, void * modparams);
+
+double GammaHHV(double MH1, double MH2, double MV, double Coupling);
+
+double GammaHHV_VEGAS(double *Q2, size_t dim, void * modparams);
 
 // Following are the functions that will be used in Numerical integral 
 
@@ -46,7 +61,7 @@ double GammaHVAOFF(double MH, double MV1, double GA1, GMModel &Mod, SFunc S, SFu
 // This one uses VEGAS algorithm to perform the integral
 double GammaHVVOFF_VEGAS(double MH, double MV1, double GA1, double MV2, double GA2, GMModel &Mod, SFunc FS, SFunc FStilde, double eta);
 
-#define NChannel 18
+#define NChannel 32
 class GMDecay
 {
 public:
@@ -57,21 +72,24 @@ public:
 
     void SetModel(GMModel Mod);
     void SetModel(double MH, double MH3, double MH5, double M2);
-    double GetGammaHVV(PID Mother, PID P1, PID P2);
+    double GetGammaHPartial(PID Mother, PID P1, PID P2);
     double GetGammaHtot(PID Mother);
 
-    double GetGammaHVVEFT(PID Mother, PID P1, PID P2);
+    double GetGammaHPartialEFT(PID Mother, PID P1, PID P2);
     double GetGammaHtotEFT(PID Mother);
 private: 
     GMModel _Mod;
     void ResettingGammas();
-    double GammaHVV[NChannel];
-    double GammaHVVEFT[NChannel];
+    double GammaHPartial[NChannel];
+    double GammaHPartialEFT[NChannel];
     int ToChannelID(PID Mother, PID P1, PID P2);
     void CalcGammaHVV(PID Mother, PID P1, PID P2);
+    void CalcGammaHHV(PID Mother, PID P1, PID P2);
     void CalcGammaHVVEFT(PID Mother, PID P1, PID P2);
-    void GetMotherMass(PID Mother, double &mass);
+    void CalcGammaHHVEFT(PID Mother, PID P1, PID P2);// Just a copy of CalcGammaHHV, there is not EFT version of this calculation
+    void GetScalarMass(PID P1, double &mass);
     void GetVectorMassWidth(PID P1, double &mass, double &Gamma);
+    double GetMulti(PID Mother, PID P1, PID P2); // Check if we need to multiply by 2 for Hi->HjV channel;
     enum ChannelID
     {
         HAA = 0,
@@ -91,131 +109,23 @@ private:
         H5pWA = 14,
         H5pWZ = 15,
         H5ppWW = 16,
-        UNKOWN = 17
+        HH30Z = 17,
+        HH3pW = 18,
+        H3pHW = 19,
+        H3pH5pZ = 20,
+        H3pH5ppW = 21,
+        H3pH50W = 22,
+        H30HZ = 23,
+        H30H5pW = 24,
+        H30H50Z = 25,
+        H5pH3pZ = 26,
+        H5pH30W = 27,
+        H5ppH3pW = 28,
+        H50H3pW = 29,
+        H50H30Z = 30,
+        UNKOWN = 31
     };
-/*
-    // Gamma's for H 
-    void CalcGammaHAA();
-    double GammaHAA;
-
-    void CalcGammaHWW();
-    double GammaHWW;
-
-    void CalcGammaHZA();
-    double GammaHZA;
-
-    void CalcGammaHZZ();
-    double GammaHZZ;
-
-    void CalcGammaHtot();
-    double GammaHtot;
-
-    // CalcGamma's for H30
-    void CalcGammaH30AA();
-    double GammaH30AA;
-
-    void CalcGammaH30WW();
-    double GammaH30WW;
-
-    void CalcGammaH30ZA();
-    double GammaH30ZA;
-
-    void CalcGammaH30ZZ();
-    double GammaH30ZZ;
-
-    void CalcGammaH30tot();
-    double GammaH30tot;
-
-    // CalcGamma's for H50
-    void CalcGammaH50AA();
-    double GammaH50AA;
-
-    void CalcGammaH50WW();
-    double GammaH50WW;
-
-    void CalcGammaH50ZA();
-    double GammaH50ZA;
-
-    void CalcGammaH50ZZ();
-    double GammaH50ZZ;
-
-    void CalcGammaH50tot();
-    double GammaH50tot;
-
-    // CalcGamma's for H3pm
-    void CalcGammaH3pWA();
-    double GammaH3pWA;
-
-    void CalcGammaH3pWZ();
-    double GammaH3pWZ;
-
-    void CalcGammaH3ptot();
-    double GammaH3ptot;
-
-    // CalcGamma's for H5pm
-    void CalcGammaH5pWA();
-    double GammaH5pWA;
-
-    void CalcGammaH5pWZ();
-    double GammaH5pWZ;
-
-    void CalcGammaH5ptot();
-    double GammaH5ptot;
-
-    // CalcGamma's for H5pp
-    void CalcGammaH5ppWW();
-    double GammaH5ppWW;
-
-    void CalcGammaH5pptot();
-    double GammaH5pptot;
-*/
 };
-/*
-// Gamma's for H 
-double GammaHAA(GMModel &Mod);
 
-double GammaHWW(GMModel &Mod);
-
-double GammaHZA(GMModel &Mod);
-
-double GammaHZZ(GMModel &Mod);
-
-double GammaHtot(GMModel &Mod);
-
-// Gamma's for H30
-double GammaH30AA(GMModel &Mod);
-
-double GammaH30WW(GMModel &Mod);
-
-double GammaH30ZA(GMModel &Mod);
-
-double GammaH30ZZ(GMModel &Mod);
-
-double GammaH30tot(GMModel &Mod);
-
-// Gamma's for H50
-double GammaH50AA(GMModel &Mod);
-
-double GammaH50WW(GMModel &Mod);
-
-double GammaH50ZA(GMModel &Mod);
-
-double GammaH50ZZ(GMModel &Mod);
-
-double GammaH50tot(GMModel &Mod);
-
-// Gamma's for H3pm
-double GammaH3pWA(GMModel &Mod);
-
-double GammaH3pWZ(GMModel &Mod);
-
-// Gamma's for H5pm
-double GammaH5pWA(GMModel &Mod);
-
-double GammaH5pWZ(GMModel &Mod);
-
-// Gamma's for H5pp
-double GammaH5ppWW(GMModel &Mod);
-*/
 #endif
 

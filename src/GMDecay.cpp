@@ -23,6 +23,15 @@ double GammaHVV(double Mm, double MV1, double MV2, GMModel &Mod, SFunc FS, SFunc
     return (pow(lam,1.5)*(S*S+Stilde*Stilde)+6*MV12*MV22*pow(lam,0.5)*S*S)/(32*PI*pow(Mm,3)*eta);
 }
 
+double GammaHHV(double MH1, double MH2, double MV, double Coupling)
+{
+    double MH12 = MH1*MH1;
+    double MH22 = MH2*MH2;
+    double MV2 = MV*MV;
+    double lam = lambda(MH12,MH22,MV2);
+    return Coupling*Coupling*pow(lam,1.5)/(16*PI*pow(MH1,3)*MV2);
+}
+
 // For VEGAS Integral
 double GammaHVV_Integrand_VEGAS(double *Q2, size_t dim, void * modparams)
 {
@@ -36,6 +45,22 @@ double GammaHVV_Integrand_VEGAS(double *Q2, size_t dim, void * modparams)
     else
     {
         result = BW(Q2[0],fp->MV1,fp->GAV1)*BW(Q2[1],fp->MV2,fp->GAV2)*GammaHVV(fp->Mmother,sqrt(Q2[0]),sqrt(Q2[1]),fp->Mod,fp->S,fp->Stilde,fp->eta);
+    }
+    return result;
+}
+
+double GammaHHV_Integrand_VEGAS(double *Q2, size_t dim, void * modparams)
+{
+    GMModel_HHV_VEGAS *fp = (GMModel_HHV_VEGAS *) modparams;
+    // Integral under Q2, not the rho
+    double result;
+    if (Q2[1] >= pow(fp->MH1-sqrt(Q2[0]),2))
+    {
+        result = 0.0;
+    }
+    else
+    {
+        result = BW(Q2[0],fp->MH2,fp->GAH2)*BW(Q2[1],fp->MV,fp->GAV)*GammaHHV(fp->MH1,sqrt(Q2[0]),sqrt(Q2[1]),fp->CHHV);
     }
     return result;
 }
@@ -205,7 +230,7 @@ double GammaHVVOFF_VEGAS(double MH, double MV1, double GA1, double MV2, double G
     GMModel_VEGAS fp = {MH,MV1,GA1,MV2,GA2,FS,FStilde,eta,Mod};
     gsl_monte_function G = {&GammaHVV_Integrand_VEGAS, 2, &fp};
 
-    size_t calls = 1000;
+    size_t calls = GSLCALLS;
     gsl_rng_env_setup();
 
     T = gsl_rng_default;
@@ -216,6 +241,119 @@ double GammaHVVOFF_VEGAS(double MH, double MV1, double GA1, double MV2, double G
     gsl_monte_vegas_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
 
     gsl_monte_vegas_free(s);
+    gsl_rng_free(r);
+
+    return res/PI2;
+
+}
+
+double GammaHVVOFF_MISER(double MH, double MV1, double GA1, double MV2, double GA2, GMModel &Mod, SFunc FS, SFunc FStilde, double eta)
+{
+    if (MH > MV1 + MV2)
+    {
+        return GammaHVV(MH, MV1, MV2, Mod, FS, FStilde, eta);
+    }
+
+    double res, err;
+
+    double Q2L[2] = {0,0};
+    double Q2U[2] = {MH*MH,MH*MH};
+
+    const gsl_rng_type *T;
+    gsl_rng *r;
+
+    GMModel_VEGAS fp = {MH,MV1,GA1,MV2,GA2,FS,FStilde,eta,Mod};
+    gsl_monte_function G = {&GammaHVV_Integrand_VEGAS, 2, &fp};
+
+    size_t calls = GSLCALLS;
+    gsl_rng_env_setup();
+
+    T = gsl_rng_default;
+    r = gsl_rng_alloc(T);
+
+    gsl_monte_miser_state *s = gsl_monte_miser_alloc(2);
+
+    gsl_monte_miser_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
+
+    gsl_monte_miser_free(s);
+    gsl_rng_free(r);
+
+    return res/PI2;
+
+}
+
+double GammaHHVOFF_VEGAS(double MH1, double MH2, double GAH2, double MV, double GAV, double CHHV)
+{
+    if (MH1 > MH2 + MV)
+    {
+        return GammaHHV(MH1, MH2, MV, CHHV);
+    }
+    if (MH1 <= MH2 + 0.1)
+    {
+        return 0;
+    }
+
+    double res, err;
+
+    double Q2L[2] = {0,0};
+    double Q2U[2] = {MH1*MH1,MH1*MH1};
+
+    const gsl_rng_type *T;
+    gsl_rng *r;
+
+    GMModel_HHV_VEGAS fp = {MH1,MH2,GAH2,MV,GAV,CHHV};
+    gsl_monte_function G = {&GammaHHV_Integrand_VEGAS, 2, &fp};
+
+    size_t calls = GSLCALLS;
+    gsl_rng_env_setup();
+
+    T = gsl_rng_default;
+    r = gsl_rng_alloc(T);
+
+    gsl_monte_vegas_state *s = gsl_monte_vegas_alloc(2);
+
+    gsl_monte_vegas_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
+
+    gsl_monte_vegas_free(s);
+    gsl_rng_free(r);
+
+    return res/PI2;
+
+}
+
+double GammaHHVOFF_MISER(double MH1, double MH2, double GAH2, double MV, double GAV, double CHHV)
+{
+    if (MH1 > MH2 + MV)
+    {
+        return GammaHHV(MH1, MH2, MV, CHHV);
+    }
+    if (MH1 <= MH2 + 0.1)
+    {
+        return 0;
+    }
+
+    double res, err;
+
+    double Q2L[2] = {0,0};
+    double Q2U[2] = {MH1*MH1,MH1*MH1};
+
+    const gsl_rng_type *T;
+    gsl_rng *r;
+
+    GMModel_HHV_VEGAS fp = {MH1,MH2,GAH2,MV,GAV,CHHV};
+    gsl_monte_function G = {&GammaHHV_Integrand_VEGAS, 2, &fp};
+
+    size_t calls = GSLCALLS;
+    gsl_rng_env_setup();
+
+    T = gsl_rng_default;
+    r = gsl_rng_alloc(T);
+
+    gsl_monte_miser_state *s = gsl_monte_miser_alloc(2);
+
+    gsl_monte_miser_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
+
+    gsl_monte_miser_free(s);
     gsl_rng_free(r);
 
     return res/PI2;
@@ -263,38 +401,13 @@ void GMDecay::SetModel(double MH, double MH3, double MH5, double M2)
 
 void GMDecay::ResettingGammas()
 {
-/*
-    GammaHAA = -1;
-    GammaHWW = -1;
-    GammaHZA = -1;
-    GammaHZZ = -1;
-    GammaHtot = -1;
-    GammaH30AA = -1;
-    GammaH30WW = -1;
-    GammaH30ZA = -1;
-    GammaH30ZZ = -1;
-    GammaH30tot = -1;
-    GammaH50AA = -1;
-    GammaH50WW = -1;
-    GammaH50ZA = -1;
-    GammaH50ZZ = -1;
-    GammaH50tot = -1;
-    GammaH3pWA = -1;
-    GammaH3pWZ = -1;
-    GammaH3ptot = -1;
-    GammaH5pWA = -1;
-    GammaH5pWZ = -1;
-    GammaH5ptot = -1;
-    GammaH5ppWW = -1;
-    GammaH5pptot = -1;
-*/
     for (int i = 0; i < NChannel; ++i)
     {
-        GammaHVV[i] = -1;
-        GammaHVVEFT[i] = -1;
+        GammaHPartial[i] = -1;
+        GammaHPartialEFT[i] = -1;
     }
-    GammaHVV[NChannel-1] = 0;
-    GammaHVVEFT[NChannel-1] = 0;
+    GammaHPartial[NChannel-1] = 0;
+    GammaHPartialEFT[NChannel-1] = 0;
 }
 
 int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
@@ -316,6 +429,14 @@ int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
         else if ( P1 == Z && P2 == Z)
         {
           return HZZ;
+        }
+        else if ((P1 == H30 && P2 == Z) || (P1 == Z && P2 == H30))
+        {
+            return HH30Z;
+        }
+        else if ((P1 == H3p && P2 == W) || (P1 == W && P2 == H3p))
+        {
+            return HH3pW;
         }
         else
         {
@@ -341,6 +462,18 @@ int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
         {
           return H30ZZ;
         }
+        else if ((P1 == H && P2 == Z) || (P1 == Z && P2 == H))
+        {
+            return H30HZ;
+        }
+        else if ((P1 == H5p && P2 == W) || (P1 == W && P2 == H5p))
+        {
+            return H30H5pW;
+        }
+        else if ((P1 == H50 && P2 == Z) || (P1 == Z && P2 == H50))
+        {
+            return H30H50Z;
+        }
         else
         {
           std::cout<<"Warning: Didn't Find the desired H30 channel, using UNKOWN instead"<<std::endl;
@@ -365,6 +498,14 @@ int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
         {
           return H50ZZ;
         }
+        else if ((P1 == H3p && P2 == W) || (P1 == W && P2 == H3p))
+        {
+            return H50H3pW;
+        }
+        else if ((P1 == H30 && P2 == Z) || (P1 == Z && P2 == H30))
+        {
+            return H50H30Z;
+        }
         else
         {
           std::cout<<"Warning: Didn't Find the desired H50 channel, using UNKOWN instead"<<std::endl;
@@ -380,6 +521,22 @@ int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
         else if ((P1 == W && P2 == Z) || (P1 == Z && P2 == W))
         {
           return H3pWZ;
+        }
+        else if ((P1 == H && P2 == W) || (P1 == W && P2 == H))
+        {
+            return H3pHW;
+        }
+        else if ((P1 == H5p && P2 == Z) || (P1 == Z && P2 == H5p))
+        {
+            return H3pH5pZ;
+        }
+        else if ((P1 == H5pp && P2 == W) || (P1 == W && P2 == H5pp))
+        {
+            return H3pH5ppW;
+        }
+        else if ((P1 == H50 && P2 == W) || (P1 == W && P2 == H50))
+        {
+            return H3pH50W;
         }
         else
         {
@@ -397,6 +554,14 @@ int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
         {
           return H5pWZ;
         }
+        else if ((P1 == H3p && P2 == Z) || (P1 == Z && P2 == H3p))
+        {
+            return H5pH3pZ;
+        }
+        else if ((P1 == H30 && P2 == W) || (P1 == W && P2 == H30))
+        {
+            return H5pH30W;
+        }
         else
         {
           std::cout<<"Warning: Didn't Find the desired H5p channel, using UNKOWN instead"<<std::endl;
@@ -408,6 +573,10 @@ int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
         if (P1 == W && P2 == W)
         {
           return H5ppWW;
+        }
+        else if ((P1 == H3p && P2 == W) || (P1 == W && P2 == H3p))
+        {
+            return H5ppH3pW;
         }
         else
         {
@@ -422,7 +591,7 @@ int GMDecay::ToChannelID(PID Mother, PID P1, PID P2)
     }
 }
 
-void GMDecay::GetMotherMass(PID Mother, double &mass)
+void GMDecay::GetScalarMass(PID Mother, double &mass)
 {
     if (Mother == H)
     {
@@ -472,7 +641,7 @@ void GMDecay::GetVectorMassWidth(PID P1, double &mass, double &Gamma)
 void GMDecay::CalcGammaHVV(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHVV[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartial[channel] > 0 || channel == UNKOWN)
     {
         return;
     }
@@ -481,27 +650,56 @@ void GMDecay::CalcGammaHVV(PID Mother, PID P1, PID P2)
 
     double eta = P1==P2?2:1;
     double m1, m2, m3, ga2, ga3;
-    GetMotherMass(Mother,m1);
+    GetScalarMass(Mother,m1);
     GetVectorMassWidth(P1,m2,ga2);
     GetVectorMassWidth(P2,m3,ga3);
     if ((ga3 < 0 && ga2 > 0)||(ga3 < 0 && ga2 < 0))
     {
-        GammaHVV[channel] = GammaHVAOFF(m1,m2,ga2,_Mod,SHVV,STilde,eta);
+        GammaHPartial[channel] = GammaHVAOFF(m1,m2,ga2,_Mod,SHVV,STilde,eta);
     }
     else if (ga2 < 0 && ga3 > 0)
     {
-        GammaHVV[channel] = GammaHVAOFF(m1,m3,ga3,_Mod,SHVV,STilde,eta);
+        GammaHPartial[channel] = GammaHVAOFF(m1,m3,ga3,_Mod,SHVV,STilde,eta);
     }
     else
     {
-        GammaHVV[channel] = GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        GammaHPartial[channel] = GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
     }
+}
+
+void GMDecay::CalcGammaHHV(PID Mother, PID P1, PID P2)
+{
+    PID temp;
+    if (P2>P1)
+    {
+        temp = P1;
+        P1 = P2;
+        P2 = temp;
+    }
+    int channel = ToChannelID(Mother, P1, P2);
+    if (GammaHPartial[channel] > 0 || channel == UNKOWN)
+    {
+        return;
+    }
+    double CHHV = GetHHVCoupling(Mother,P1,P2);
+    double eta = GetMulti(Mother, P1, P2);
+    double m1, m2, m3, ga2, ga3;
+    GetScalarMass(Mother,m1);
+    GetScalarMass(P1,m2);
+    if (m1 < m2 + 0.1)
+    {
+        GammaHPartial[channel] = 0.0;
+        return;
+    }
+    ga2 = GetGammaHtot(P1);
+    GetVectorMassWidth(P2,m3,ga3);
+    GammaHPartial[channel] = eta*GammaHHVOFF_MISER(m1,m2,ga2,m3,ga3,CHHV);
 }
 
 void GMDecay::CalcGammaHVVEFT(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHVVEFT[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartialEFT[channel] > 0 || channel == UNKOWN)
     {
         return;
     }
@@ -511,49 +709,92 @@ void GMDecay::CalcGammaHVVEFT(PID Mother, PID P1, PID P2)
 
     double eta = P1==P2?2:1;
     double m1, m2, m3, ga2, ga3;
-    GetMotherMass(Mother,m1);
+    GetScalarMass(Mother,m1);
     GetVectorMassWidth(P1,m2,ga2);
     GetVectorMassWidth(P2,m3,ga3);
     if ((ga3 < 0 && ga2 > 0)||(ga3 < 0 && ga2 < 0))
     {
-        GammaHVVEFT[channel] = ratio*ratio*GammaHVAOFF(m1,m2,ga2,_Mod,SHVV,STilde,eta);
+        GammaHPartialEFT[channel] = ratio*ratio*GammaHVAOFF(m1,m2,ga2,_Mod,SHVV,STilde,eta);
     }
     else if (ga2 < 0 && ga3 > 0)
     {
-        GammaHVVEFT[channel] = ratio*ratio*GammaHVAOFF(m1,m3,ga3,_Mod,SHVV,STilde,eta);
+        GammaHPartialEFT[channel] = ratio*ratio*GammaHVAOFF(m1,m3,ga3,_Mod,SHVV,STilde,eta);
     }
     else
     {
-        GammaHVVEFT[channel] = ratio*ratio*GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        GammaHPartialEFT[channel] = ratio*ratio*GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
     }
 }
 
-double GMDecay::GetGammaHVV(PID Mother, PID P1, PID P2)
+void GMDecay::CalcGammaHHVEFT(PID Mother, PID P1, PID P2)
+{
+    PID temp;
+    if (P2>P1)
+    {
+        temp = P1;
+        P1 = P2;
+        P2 = temp;
+    }
+    int channel = ToChannelID(Mother, P1, P2);
+    if (GammaHPartialEFT[channel] > 0 || channel == UNKOWN)
+    {
+        return;
+    }
+    else if (GammaHPartial[channel] > 0)
+    {
+        GammaHPartialEFT[channel] = GammaHPartial[channel];
+        return;
+    }
+    double CHHV = GetHHVCoupling(Mother,P1,P2);
+    double eta = GetMulti(Mother, P1, P2);
+    double m1, m2, m3, ga2, ga3;
+    GetScalarMass(Mother,m1);
+    GetScalarMass(P1,m2);
+    if (m1 < m2 + 0.1)
+    {
+        GammaHPartialEFT[channel] = 0.0;
+        return;
+    }
+    ga2 = GetGammaHtot(P1);
+    GetVectorMassWidth(P2,m3,ga3);
+    GammaHPartialEFT[channel] = eta*GammaHHVOFF_MISER(m1,m2,ga2,m3,ga3,CHHV);
+}
+
+double GMDecay::GetGammaHPartial(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHVV[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartial[channel] > 0 || channel == UNKOWN)
     {
-        return GammaHVV[channel];
+        return GammaHPartial[channel];
     }
-    else
+    if (P1 < 30 && P2 < 30)
     {
         CalcGammaHVV(Mother, P1, P2);
     }
-    return GammaHVV[channel];
+    else
+    {
+        // std::cout<<"Calculating: HHV"<<Mother<<"  "<<P1<<" "<<P2<<std::endl;
+        CalcGammaHHV(Mother, P1, P2);
+    }
+    return GammaHPartial[channel];
 }
 
-double GMDecay::GetGammaHVVEFT(PID Mother, PID P1, PID P2)
+double GMDecay::GetGammaHPartialEFT(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHVVEFT[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartialEFT[channel] > 0 || channel == UNKOWN)
     {
-        return GammaHVVEFT[channel];
+        return GammaHPartialEFT[channel];
     }
-    else
+    if (P1 < 30 && P2 < 30)
     {
         CalcGammaHVVEFT(Mother, P1, P2);
     }
-    return GammaHVVEFT[channel];
+    else
+    {
+        CalcGammaHHVEFT(Mother, P1, P2);
+    }
+    return GammaHPartialEFT[channel];
 }
 
 double GMDecay::GetGammaHtot(PID Mother)
@@ -561,38 +802,52 @@ double GMDecay::GetGammaHtot(PID Mother)
     double Gammatot=0.0;
     if (Mother == H)
     {
-        Gammatot += GetGammaHVV(H,A,A);
-        Gammatot += GetGammaHVV(H,W,W);
-        Gammatot += GetGammaHVV(H,Z,A);
-        Gammatot += GetGammaHVV(H,Z,Z);
+        Gammatot += GetGammaHPartial(H,A,A);
+        Gammatot += GetGammaHPartial(H,W,W);
+        Gammatot += GetGammaHPartial(H,Z,A);
+        Gammatot += GetGammaHPartial(H,Z,Z);
+        Gammatot += GetGammaHPartial(H,H30,Z);
+        Gammatot += GetGammaHPartial(H,H3p,W);
     }
     else if (Mother == H30)
     {
-        Gammatot += GetGammaHVV(H30,A,A);
-        Gammatot += GetGammaHVV(H30,W,W);
-        Gammatot += GetGammaHVV(H30,Z,A);
-        Gammatot += GetGammaHVV(H30,Z,Z);
+        Gammatot += GetGammaHPartial(H30,A,A);
+        Gammatot += GetGammaHPartial(H30,W,W);
+        Gammatot += GetGammaHPartial(H30,Z,A);
+        Gammatot += GetGammaHPartial(H30,Z,Z);
+        Gammatot += GetGammaHPartial(H30,H,Z);
+        Gammatot += GetGammaHPartial(H30,H5p,W);
+        Gammatot += GetGammaHPartial(H30,H50,Z);
     }
     else if (Mother == H50)
     {
-        Gammatot += GetGammaHVV(H50,A,A);
-        Gammatot += GetGammaHVV(H50,W,W);
-        Gammatot += GetGammaHVV(H50,Z,A);
-        Gammatot += GetGammaHVV(H50,Z,Z);
+        Gammatot += GetGammaHPartial(H50,A,A);
+        Gammatot += GetGammaHPartial(H50,W,W);
+        Gammatot += GetGammaHPartial(H50,Z,A);
+        Gammatot += GetGammaHPartial(H50,Z,Z);
+        Gammatot += GetGammaHPartial(H50,H3p,W);
+        Gammatot += GetGammaHPartial(H50,H30,Z);
     }
     else if (Mother == H3p)
     {
-        Gammatot += GetGammaHVV(H3p,W,A);
-        Gammatot += GetGammaHVV(H3p,W,Z);
+        Gammatot += GetGammaHPartial(H3p,W,A);
+        Gammatot += GetGammaHPartial(H3p,W,Z);
+        Gammatot += GetGammaHPartial(H3p,H,W);
+        Gammatot += GetGammaHPartial(H3p,H5p,Z);
+        Gammatot += GetGammaHPartial(H3p,H5pp,W);
+        Gammatot += GetGammaHPartial(H3p,H50,W);
     }
     else if (Mother == H5p)
     {
-        Gammatot += GetGammaHVV(H5p,W,A);
-        Gammatot += GetGammaHVV(H5p,W,Z);
+        Gammatot += GetGammaHPartial(H5p,W,A);
+        Gammatot += GetGammaHPartial(H5p,W,Z);
+        Gammatot += GetGammaHPartial(H5p,H3p,Z);
+        Gammatot += GetGammaHPartial(H5p,H30,W);
     }
     else if (Mother == H5pp)
     {
-        Gammatot += GetGammaHVV(H5pp,W,W);
+        Gammatot += GetGammaHPartial(H5pp,W,W);
+        Gammatot += GetGammaHPartial(H5pp,H3p,W);
     }
     return Gammatot;
 }
@@ -602,42 +857,73 @@ double GMDecay::GetGammaHtotEFT(PID Mother)
     double Gammatot=0.0;
     if (Mother == H)
     {
-        Gammatot += GetGammaHVVEFT(H,A,A);
-        Gammatot += GetGammaHVVEFT(H,W,W);
-        Gammatot += GetGammaHVVEFT(H,Z,A);
-        Gammatot += GetGammaHVVEFT(H,Z,Z);
+        Gammatot += GetGammaHPartialEFT(H,A,A);
+        Gammatot += GetGammaHPartialEFT(H,W,W);
+        Gammatot += GetGammaHPartialEFT(H,Z,A);
+        Gammatot += GetGammaHPartialEFT(H,Z,Z);
+        Gammatot += GetGammaHPartialEFT(H,H30,Z);
+        Gammatot += GetGammaHPartialEFT(H,H3p,W);
     }
     else if (Mother == H30)
     {
-        Gammatot += GetGammaHVVEFT(H30,A,A);
-        Gammatot += GetGammaHVVEFT(H30,W,W);
-        Gammatot += GetGammaHVVEFT(H30,Z,A);
-        Gammatot += GetGammaHVVEFT(H30,Z,Z);
+        Gammatot += GetGammaHPartialEFT(H30,A,A);
+        Gammatot += GetGammaHPartialEFT(H30,W,W);
+        Gammatot += GetGammaHPartialEFT(H30,Z,A);
+        Gammatot += GetGammaHPartialEFT(H30,Z,Z);
+        Gammatot += GetGammaHPartialEFT(H30,H,Z);
+        Gammatot += GetGammaHPartialEFT(H30,H5p,W);
+        Gammatot += GetGammaHPartialEFT(H30,H50,Z);
     }
     else if (Mother == H50)
     {
-        Gammatot += GetGammaHVVEFT(H50,A,A);
-        Gammatot += GetGammaHVVEFT(H50,W,W);
-        Gammatot += GetGammaHVVEFT(H50,Z,A);
-        Gammatot += GetGammaHVVEFT(H50,Z,Z);
+        Gammatot += GetGammaHPartialEFT(H50,A,A);
+        Gammatot += GetGammaHPartialEFT(H50,W,W);
+        Gammatot += GetGammaHPartialEFT(H50,Z,A);
+        Gammatot += GetGammaHPartialEFT(H50,Z,Z);
+        Gammatot += GetGammaHPartialEFT(H50,H3p,W);
+        Gammatot += GetGammaHPartialEFT(H50,H30,Z);
     }
     else if (Mother == H3p)
     {
-        Gammatot += GetGammaHVVEFT(H3p,W,A);
-        Gammatot += GetGammaHVVEFT(H3p,W,Z);
+        Gammatot += GetGammaHPartialEFT(H3p,W,A);
+        Gammatot += GetGammaHPartialEFT(H3p,W,Z);
+        Gammatot += GetGammaHPartialEFT(H3p,H,W);
+        Gammatot += GetGammaHPartialEFT(H3p,H5p,Z);
+        Gammatot += GetGammaHPartialEFT(H3p,H5pp,W);
+        Gammatot += GetGammaHPartialEFT(H3p,H50,W);
     }
     else if (Mother == H5p)
     {
-        Gammatot += GetGammaHVVEFT(H5p,W,A);
-        Gammatot += GetGammaHVVEFT(H5p,W,Z);
+        Gammatot += GetGammaHPartialEFT(H5p,W,A);
+        Gammatot += GetGammaHPartialEFT(H5p,W,Z);
+        Gammatot += GetGammaHPartialEFT(H5p,H3p,Z);
+        Gammatot += GetGammaHPartialEFT(H5p,H30,W);
     }
     else if (Mother == H5pp)
     {
-        Gammatot += GetGammaHVVEFT(H5pp,W,W);
+        Gammatot += GetGammaHPartialEFT(H5pp,W,W);
+        Gammatot += GetGammaHPartialEFT(H5pp,H3p,W);
     }
     return Gammatot;
 }
 
+double GMDecay::GetMulti(PID Mother, PID P1, PID P2)
+{
+    double multi = 1;
+    if (Mother == H && ((P1 == H3p && P2 == W) || (P1 == W && P2 == H3p)))
+    {
+        multi = 2;
+    }
+    else if (Mother == H30 && ((P1 == H5p && P2 == W) || (P1 == W && P2 == H5p)))
+    {
+        multi = 2;
+    }
+    else if (Mother == H50 && ((P1 == H3p && P2 == W) || (P1 == W && P2 == H3p)))
+    {
+        multi = 2;
+    }
+    return multi;
+}
 
 
 
