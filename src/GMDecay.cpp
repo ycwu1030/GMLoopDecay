@@ -1,365 +1,6 @@
 #include "GMDecay.h"
 #include <iostream>
 
-
-double lambda(double a, double b, double c)
-{
-    return a*a+b*b+c*c-2*a*b-2*b*c-2*c*a;
-}
-
-double GammaHVV(double Mm, double MV1, double MV2, GMModel &Mod, SFunc FS, SFunc FStilde, double eta)
-{
-    double Mm2 = Mm*Mm;
-    double MV12 = MV1*MV1;
-    double MV22 = MV2*MV2;
-    double MH2 = Mod.MH*Mod.MH;
-    double MH32 = Mod.MH3*Mod.MH3;
-    double MH52 = Mod.MH5*Mod.MH5;
-    double lam = lambda(Mm2,MV12,MV22);
-    // std::cout<<lam<<std::endl;
-    double S = std::abs(FS(MH2,MH32,MH52,Mod.M2,Mm2,MV12,MV22));
-    double Stilde = std::abs(FStilde(MH2,MH32,MH52,Mod.M2,Mm2,MV12,MV22));
-    clearcache(); // This is used to clear the cache produced by LoopTools, otherwise the Lookup table will be too large if you loop over some parameters
-    return (pow(lam,1.5)*(S*S+Stilde*Stilde)+6*MV12*MV22*pow(lam,0.5)*S*S)/(32*PI*pow(Mm,3)*eta);
-}
-
-double GammaHHV(double MH1, double MH2, double MV, double Coupling)
-{
-    double MH12 = MH1*MH1;
-    double MH22 = MH2*MH2;
-    double MV2 = MV*MV;
-    double lam = lambda(MH12,MH22,MV2);
-    return Coupling*Coupling*pow(lam,1.5)/(16*PI*pow(MH1,3)*MV2);
-}
-
-// For VEGAS Integral
-double GammaHVV_Integrand_VEGAS(double *Q2, size_t dim, void * modparams)
-{
-    GMModel_VEGAS *fp = (GMModel_VEGAS *) modparams;
-    // Integral under Q2, not the rho
-    double result;
-    if (Q2[1] >= pow(fp->Mmother-sqrt(Q2[0]),2))
-    {
-        result = 0.0;
-    }
-    else
-    {
-        result = BW(Q2[0],fp->MV1,fp->GAV1)*BW(Q2[1],fp->MV2,fp->GAV2)*GammaHVV(fp->Mmother,sqrt(Q2[0]),sqrt(Q2[1]),fp->Mod,fp->S,fp->Stilde,fp->eta);
-    }
-    return result;
-}
-
-double GammaHHV_Integrand_VEGAS(double *Q2, size_t dim, void * modparams)
-{
-    GMModel_HHV_VEGAS *fp = (GMModel_HHV_VEGAS *) modparams;
-    // Integral under Q2, not the rho
-    double result;
-    if (Q2[1] >= pow(fp->MH1-sqrt(Q2[0]),2))
-    {
-        result = 0.0;
-    }
-    else
-    {
-        result = BW(Q2[0],fp->MH2,fp->GAH2)*BW(Q2[1],fp->MV,fp->GAV)*GammaHHV(fp->MH1,sqrt(Q2[0]),sqrt(Q2[1]),fp->CHHV);
-    }
-    return result;
-}
-
-// Following are the functions that will be used in Numerical integral 
-
-double Rho(double Q, double M, double Gamma)
-{
-    return 1.0/PI*atan((Q*Q-M*M)/(M*Gamma));
-}
-
-double Q(double rho, double M, double Gamma)
-{
-    return sqrt(M*Gamma*tan(PI*rho)+M*M);
-}
-
-double BW(double Q2, double M, double Gamma)
-{
-    return Q2*Gamma/M/(pow(Q2-M*M,2)+pow(M*Gamma,2));
-}
-
-double GammaHVVOFF(double MH, double MV1, double GA1, double MV2, double GA2, GMModel &Mod, SFunc FS, SFunc FStilde, double eta)
-{
-    int steps;
-    double R1I, R1F, R1F1, R1F2, R2I, R2F, R2F1, R2F2, R1, R2;
-    double interval1, interval2;
-    double GammaFinal=0.0;
-    double SLICE;
-    double Q1,Q2;
-    double PIECE1,PIECE2;
-    if (MH > MV1 + MV2)
-    {
-        steps = 100;
-
-        R1I = Rho(0,MV1,GA1);
-        R1F = Rho(MH,MV1,GA1);
-        R2I = Rho(0,MV2,GA2);
-        interval1 = (R1F-R1I)/steps;
-        for (int i = 0; i < steps; ++i)
-        {
-            R1 = R1I + (i+0.5)*interval1;
-            Q1 = Q(R1,MV1,GA1);
-            R2F = Rho(MH-Q1,MV2,GA2);
-            SLICE = 0.0;
-            interval2 = (R2F-R2I)/steps;
-            for (int j = 0; j < steps; ++j)
-            {
-                R2 = R2I + (j+0.5)*interval2;
-                Q2 = Q(R2,MV2,GA2);
-                SLICE += interval2*pow(Q1*Q2/(MV1*MV2),2)*GammaHVV(MH,Q1,Q2,Mod,FS,FStilde,eta);
-            }
-            GammaFinal += SLICE*interval1;
-        }
-    }
-    else
-    {
-        steps = OFFSHELLSTEPS;
-        // The Integral region is divided into two parts for better numerical behavior
-        // First region:
-        R1I = Rho(0,MV1,GA1);
-        R1F = Rho(MH,MV1,GA1);
-        R2I = Rho(0,MV2,GA2);
-        PIECE1 = 0.0;
-        interval1 = (R1F-R1I)/steps;
-#ifdef DEBUG
-        std::cout<<"Entering Loop of the first piece in off-shell calculation"<<std::endl;
-#endif
-        for (int i = 0; i < steps; ++i)
-        {
-            R1 = R1I + (i+0.5)*interval1;
-            Q1 = Q(R1,MV1,GA1);
-            R2F1 = Rho(MH-Q1,MV2,GA2);
-            R2F2 = Rho(MV2*Q1/MV1,MV2,GA2);
-            R2F = R2F1<R2F2?R2F1:R2F2; // This condition separate the whole region into two.
-            SLICE = 0.0;
-            interval2 = (R2F-R2I)/steps;
-            for (int j = 0; j < steps; ++j)
-            {
-                R2 = R2I + (j+0.5)*interval2;
-                Q2 = Q(R2,MV2,GA2);
-                SLICE+=interval2*pow(Q1*Q2/(MV1*MV2),2)*GammaHVV(MH,Q1,Q2,Mod,FS,FStilde,eta);
-#ifdef DEBUG
-                // if ((i+1)%100==0&&(j+1)%100==0)
-                {
-                    std::cout<<"Looping i: "<<i<<" j: "<<j<<"\r";
-                }
-#endif
-            }
-            PIECE1 += SLICE*interval1;
-        }
-#ifdef DEBUG
-        std::cout<<std::endl;
-        std::cout<<"Exit Loop of the first piece in off-shell calculation;"<<std::endl;
-#endif
-
-        // Second region:
-        R2I = Rho(0,MV2,GA2);
-        R2F = Rho(MH,MV2,GA2);
-        R1I = Rho(0,MV1,GA1);
-        PIECE2 = 0.0;
-        interval2 = (R2F-R2I)/steps;
-        for (int i = 0; i < steps; ++i)
-        {
-            R2 = R2I + (i+0.5)*interval2;
-            Q2 = Q(R2,MV2,GA2);
-            R1F1 = Rho(MH-Q2,MV1,GA1);
-            R1F2 = Rho(MV1*Q2/MV2,MV1,GA1);
-            R1F = R1F1<R1F2?R1F1:R1F2;
-            SLICE = 0.0;
-            interval1 = (R1F-R1I)/steps;
-            for (int j = 0; j < steps; ++j)
-            {
-                R1 = R1I + (j+0.5)*interval1;
-                Q1 = Q(R1,MV1,GA1);
-                SLICE += interval1*pow(Q1*Q2/(MV1*MV2),2)*GammaHVV(MH,Q1,Q2,Mod,FS,FStilde,eta);
-            }
-            PIECE2 += interval2*SLICE;
-        }
-        GammaFinal = PIECE1 + PIECE2;
-    }
-    return GammaFinal;
-}
-
-// For off-shell decay involving one gamma final states (The gamma can be treated as always on-shell)
-double GammaHVAOFF(double MH, double MV1, double GA1, GMModel &Mod, SFunc FS, SFunc FStilde, double eta)
-{
-    if (MH > MV1)
-    {
-        return GammaHVV(MH, MV1, 0, Mod, FS, FStilde, eta);
-    }
-    int steps;
-    double R1I, R1F, R1;
-    double interval1;
-    double GammaFinal=0.0;
-    double SLICE;
-    double Q1;
-    steps = OFFSHELLSTEPS;
-    R1I = Rho(0,MV1,GA1);
-    R1F = Rho(MH,MV1,GA1);
-    interval1 = (R1F-R1I)/steps;
-    SLICE = 0.0;
-    for (int i = 0; i < steps; ++i)
-    {
-        R1 = R1I + (i+0.5)*interval1;
-        Q1 = Q(R1,MV1,GA1);
-        SLICE += interval1*pow(Q1/MV1,2)*GammaHVV(MH,Q1,0,Mod,FS,FStilde,eta);
-    }
-    GammaFinal = SLICE;
-    return GammaFinal;
-}
-
-double GammaHVVOFF_VEGAS(double MH, double MV1, double GA1, double MV2, double GA2, GMModel &Mod, SFunc FS, SFunc FStilde, double eta)
-{
-    if (MH > MV1 + MV2)
-    {
-        return GammaHVV(MH, MV1, MV2, Mod, FS, FStilde, eta);
-    }
-
-    double res, err;
-
-    double Q2L[2] = {0,0};
-    double Q2U[2] = {MH*MH,MH*MH};
-
-    const gsl_rng_type *T;
-    gsl_rng *r;
-
-    GMModel_VEGAS fp = {MH,MV1,GA1,MV2,GA2,FS,FStilde,eta,Mod};
-    gsl_monte_function G = {&GammaHVV_Integrand_VEGAS, 2, &fp};
-
-    size_t calls = GSLCALLS;
-    gsl_rng_env_setup();
-
-    T = gsl_rng_default;
-    r = gsl_rng_alloc(T);
-
-    gsl_monte_vegas_state *s = gsl_monte_vegas_alloc(2);
-
-    gsl_monte_vegas_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
-
-    gsl_monte_vegas_free(s);
-    gsl_rng_free(r);
-
-    return res/PI2;
-
-}
-
-double GammaHVVOFF_MISER(double MH, double MV1, double GA1, double MV2, double GA2, GMModel &Mod, SFunc FS, SFunc FStilde, double eta)
-{
-    if (MH > MV1 + MV2)
-    {
-        return GammaHVV(MH, MV1, MV2, Mod, FS, FStilde, eta);
-    }
-
-    double res, err;
-
-    double Q2L[2] = {0,0};
-    double Q2U[2] = {MH*MH,MH*MH};
-
-    const gsl_rng_type *T;
-    gsl_rng *r;
-
-    GMModel_VEGAS fp = {MH,MV1,GA1,MV2,GA2,FS,FStilde,eta,Mod};
-    gsl_monte_function G = {&GammaHVV_Integrand_VEGAS, 2, &fp};
-
-    size_t calls = GSLCALLS;
-    gsl_rng_env_setup();
-
-    T = gsl_rng_default;
-    r = gsl_rng_alloc(T);
-
-    gsl_monte_miser_state *s = gsl_monte_miser_alloc(2);
-
-    gsl_monte_miser_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
-
-    gsl_monte_miser_free(s);
-    gsl_rng_free(r);
-
-    return res/PI2;
-
-}
-
-double GammaHHVOFF_VEGAS(double MH1, double MH2, double GAH2, double MV, double GAV, double CHHV)
-{
-    if (MH1 > MH2 + MV)
-    {
-        return GammaHHV(MH1, MH2, MV, CHHV);
-    }
-    if (MH1 <= MH2 + 0.1)
-    {
-        return 0;
-    }
-
-    double res, err;
-
-    double Q2L[2] = {0,0};
-    double Q2U[2] = {MH1*MH1,MH1*MH1};
-
-    const gsl_rng_type *T;
-    gsl_rng *r;
-
-    GMModel_HHV_VEGAS fp = {MH1,MH2,GAH2,MV,GAV,CHHV};
-    gsl_monte_function G = {&GammaHHV_Integrand_VEGAS, 2, &fp};
-
-    size_t calls = GSLCALLS;
-    gsl_rng_env_setup();
-
-    T = gsl_rng_default;
-    r = gsl_rng_alloc(T);
-
-    gsl_monte_vegas_state *s = gsl_monte_vegas_alloc(2);
-
-    gsl_monte_vegas_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
-
-    gsl_monte_vegas_free(s);
-    gsl_rng_free(r);
-
-    return res/PI2;
-
-}
-
-double GammaHHVOFF_MISER(double MH1, double MH2, double GAH2, double MV, double GAV, double CHHV)
-{
-    if (MH1 > MH2 + MV)
-    {
-        return GammaHHV(MH1, MH2, MV, CHHV);
-    }
-    if (MH1 <= MH2 + 0.1)
-    {
-        return 0;
-    }
-
-    double res, err;
-
-    double Q2L[2] = {0,0};
-    double Q2U[2] = {MH1*MH1,MH1*MH1};
-
-    const gsl_rng_type *T;
-    gsl_rng *r;
-
-    GMModel_HHV_VEGAS fp = {MH1,MH2,GAH2,MV,GAV,CHHV};
-    gsl_monte_function G = {&GammaHHV_Integrand_VEGAS, 2, &fp};
-
-    size_t calls = GSLCALLS;
-    gsl_rng_env_setup();
-
-    T = gsl_rng_default;
-    r = gsl_rng_alloc(T);
-
-    gsl_monte_miser_state *s = gsl_monte_miser_alloc(2);
-
-    gsl_monte_miser_integrate(&G,Q2L,Q2U,2,calls,r,s,&res,&err);
-
-    gsl_monte_miser_free(s);
-    gsl_rng_free(r);
-
-    return res/PI2;
-
-}
-
 GMDecay::GMDecay()
 {
     _Mod.MH = 200.0;
@@ -396,6 +37,12 @@ void GMDecay::SetModel(double MH, double MH3, double MH5, double M2)
     _Mod.MH3 = MH3;
     _Mod.MH5 = MH5;
     _Mod.M2 = M2;
+    ResettingGammas();
+}
+
+void GMDecay::SetIntegralMethod(INTEGRALFLAGS flag)
+{
+    _flag = flag;
     ResettingGammas();
 }
 
@@ -641,12 +288,12 @@ void GMDecay::GetVectorMassWidth(PID P1, double &mass, double &Gamma)
 void GMDecay::CalcGammaHVV(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHPartial[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartial[channel] >= 0 || channel == UNKOWN)
     {
         return;
     }
     SFunc SHVV = GetSFunc(Mother, P1, P2);
-    SFunc STilde = GM::NOIMPLEMENTED;
+    SFunc STilde = GetSTildeFunc(Mother, P1, P2);
 
     double eta = P1==P2?2:1;
     double m1, m2, m3, ga2, ga3;
@@ -663,7 +310,31 @@ void GMDecay::CalcGammaHVV(PID Mother, PID P1, PID P2)
     }
     else
     {
-        GammaHPartial[channel] = GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        if (_flag == Q2VEGAS)
+        {
+            GammaHPartial[channel] = GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        }
+        else if (_flag == RHOVEGAS)
+        {
+            GammaHPartial[channel] = GammaHVVOFF_Flatten_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        }
+        else if (_flag == Q2MISER)
+        {
+            GammaHPartial[channel] = GammaHVVOFF_MISER(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        }
+        else if (_flag == RHOMISER)
+        {
+            GammaHPartial[channel] = GammaHVVOFF_Flatten_MISER(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        }
+        else if (_flag == NONE)
+        {
+            GammaHPartial[channel] = GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        }
+        else
+        {
+            std::cout<<"Warning: Unknown Integral flags, suing Q2VEGAS instead"<<std::endl;
+            GammaHPartial[channel] = GammaHVVOFF_VEGAS(m1,m2,ga2,m3,ga3,_Mod,SHVV,STilde,eta);
+        }
     }
 }
 
@@ -677,7 +348,7 @@ void GMDecay::CalcGammaHHV(PID Mother, PID P1, PID P2)
         P2 = temp;
     }
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHPartial[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartial[channel] >= 0 || channel == UNKOWN)
     {
         return;
     }
@@ -686,20 +357,51 @@ void GMDecay::CalcGammaHHV(PID Mother, PID P1, PID P2)
     double m1, m2, m3, ga2, ga3;
     GetScalarMass(Mother,m1);
     GetScalarMass(P1,m2);
-    if (m1 < m2 + 0.1)
+    if (m1 <= m2)
     {
         GammaHPartial[channel] = 0.0;
         return;
     }
     ga2 = GetGammaHtot(P1);
     GetVectorMassWidth(P2,m3,ga3);
-    GammaHPartial[channel] = eta*GammaHHVOFF_MISER(m1,m2,ga2,m3,ga3,CHHV);
+    if (_flag == Q2VEGAS)
+    {
+        GammaHPartial[channel] = eta*GammaHHVOFF_VEGAS(m1,m2,ga2,m3,ga3,CHHV);
+    }
+    else if (_flag == RHOVEGAS)
+    {
+        GammaHPartial[channel] = eta*GammaHHVOFF_Flatten_VEGAS(m1,m2,ga2,m3,ga3,CHHV);
+    }
+    else if (_flag == Q2MISER)
+    {
+        GammaHPartial[channel] = eta*GammaHHVOFF_MISER(m1,m2,ga2,m3,ga3,CHHV);
+    }
+    else if (_flag == RHOMISER)
+    {
+        GammaHPartial[channel] = eta*GammaHHVOFF_Flatten_MISER(m1,m2,ga2,m3,ga3,CHHV);
+    }
+    else if (_flag == NONE)
+    {
+        if (m1 > m2 + m3)
+        {
+            GammaHPartial[channel] = eta*GammaHHV(m1,m2,m3,CHHV);
+        }
+        else
+        {
+            GammaHPartial[channel] = eta*GammaHHVOFF_DIRECT(m1,m2,m3,P2,CHHV);
+        }
+    }
+    else
+    {
+        std::cout<<"Warning: Unknown Integral flags, suing Q2VEGAS instead"<<std::endl;
+        GammaHPartial[channel] = eta*GammaHHVOFF_VEGAS(m1,m2,ga2,m3,ga3,CHHV);
+    }
 }
 
 void GMDecay::CalcGammaHVVEFT(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHPartialEFT[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartialEFT[channel] >= 0 || channel == UNKOWN)
     {
         return;
     }
@@ -736,11 +438,11 @@ void GMDecay::CalcGammaHHVEFT(PID Mother, PID P1, PID P2)
         P2 = temp;
     }
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHPartialEFT[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartialEFT[channel] >= 0 || channel == UNKOWN)
     {
         return;
     }
-    else if (GammaHPartial[channel] > 0)
+    else if (GammaHPartial[channel] >= 0)
     {
         GammaHPartialEFT[channel] = GammaHPartial[channel];
         return;
@@ -750,7 +452,7 @@ void GMDecay::CalcGammaHHVEFT(PID Mother, PID P1, PID P2)
     double m1, m2, m3, ga2, ga3;
     GetScalarMass(Mother,m1);
     GetScalarMass(P1,m2);
-    if (m1 < m2 + 0.1)
+    if (m1 <= m2)
     {
         GammaHPartialEFT[channel] = 0.0;
         return;
@@ -763,7 +465,7 @@ void GMDecay::CalcGammaHHVEFT(PID Mother, PID P1, PID P2)
 double GMDecay::GetGammaHPartial(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHPartial[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartial[channel] >= 0 || channel == UNKOWN)
     {
         return GammaHPartial[channel];
     }
@@ -773,7 +475,6 @@ double GMDecay::GetGammaHPartial(PID Mother, PID P1, PID P2)
     }
     else
     {
-        // std::cout<<"Calculating: HHV"<<Mother<<"  "<<P1<<" "<<P2<<std::endl;
         CalcGammaHHV(Mother, P1, P2);
     }
     return GammaHPartial[channel];
@@ -782,7 +483,7 @@ double GMDecay::GetGammaHPartial(PID Mother, PID P1, PID P2)
 double GMDecay::GetGammaHPartialEFT(PID Mother, PID P1, PID P2)
 {
     int channel = ToChannelID(Mother, P1, P2);
-    if (GammaHPartialEFT[channel] > 0 || channel == UNKOWN)
+    if (GammaHPartialEFT[channel] >= 0 || channel == UNKOWN)
     {
         return GammaHPartialEFT[channel];
     }

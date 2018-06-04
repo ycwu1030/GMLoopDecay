@@ -43,6 +43,7 @@ ComplexType SHZZ(double MH2, double MH32, double MH52, double M2coeff, double m1
 } //end namespace GM
 typedef ComplexType (*SFunc)(double,double,double,double,double,double,double);
 SFunc GetSFunc(PID Mother, PID P1, PID P2);
+SFunc GetSTildeFunc(PID Mother, PID P1, PID P2);
 double GetSFuncEFTRatio(PID Mother, PID P1, PID P2);
 double GetHHVCoupling(PID Mother, PID P1, PID P2);
 #endif

@@ -27,30 +27,6 @@ SFunc GetSFunc(PID Mother, PID P1, PID P2)
       return GM::SHZZ;
     }
   }
-  else if (Mother == H30)
-  {
-    if (P1 == A && P2 == A)
-    {
-      return GM::SH30AA;
-    }
-    else if (P1 == W && P2 == W)
-    {
-      return GM::SH30WW;
-    }
-    else if ( (P1 == Z && P2 == A) || (P1 == A && P2 == Z) )
-    {
-      return GM::SH30ZA;
-    }
-    else if ( P1 == Z && P2 == Z)
-    {
-      return GM::SH30ZZ;
-    }
-    else
-    {
-      std::cout<<"Warning: Didn't Find the desired channel, using H30ZZ instead"<<std::endl;
-      return GM::SH30ZZ;
-    }
-  }
   else if (Mother == H50)
   {
     if (P1 == A && P2 == A)
@@ -119,10 +95,46 @@ SFunc GetSFunc(PID Mother, PID P1, PID P2)
       return GM::SH5ppWW;
     }
   }
+  else if (Mother == H30)
+  {
+    return GM::NOIMPLEMENTED;
+  }
   else
   {
-    std::cout<<"Warning: Didn't Find the desired channel, using HWW instead"<<std::endl;
-    return GM::SHWW;
+    std::cout<<"Warning: Didn't Find the desired channel, return NOIMPLEMENTED"<<std::endl;
+    return GM::NOIMPLEMENTED;
+  }
+}
+
+SFunc GetSTildeFunc(PID Mother, PID P1, PID P2)
+{
+  if (Mother == H30)
+  {
+    if (P1 == A && P2 == A)
+    {
+      return GM::SH30AA;
+    }
+    else if (P1 == W && P2 == W)
+    {
+      return GM::SH30WW;
+    }
+    else if ( (P1 == Z && P2 == A) || (P1 == A && P2 == Z) )
+    {
+      return GM::SH30ZA;
+    }
+    else if ( P1 == Z && P2 == Z)
+    {
+      return GM::SH30ZZ;
+    }
+    else
+    {
+      std::cout<<"Warning: Didn't Find the desired channel, using H30ZZ instead"<<std::endl;
+      return GM::SH30ZZ;
+    }
+  }
+  else
+  {
+    return GM::NOIMPLEMENTED;
   }
 }
 

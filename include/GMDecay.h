@@ -3,63 +3,16 @@
 
 #include "GMModelParameters.h"
 #include "GMFormFactorFunction.h"
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_monte.h>
-#include <gsl/gsl_monte_vegas.h>
-#include <gsl/gsl_monte_miser.h>
+#include "GMHVVHHVChannel.h"
 
-typedef struct
+enum INTEGRALFLAGS
 {
-	double Mmother;
-	double MV1;
-	double GAV1;
-	double MV2;
-	double GAV2;
-	SFunc S;
-	SFunc Stilde;
-	double eta;
-
-	GMModel Mod;
-} GMModel_VEGAS;
-
-typedef struct
-{
-    double MH1;
-    double MH2;
-    double GAH2;
-    double MV;
-    double GAV;
-    double CHHV;
-} GMModel_HHV_VEGAS;
-
-double lambda(double a, double b, double c);
-
-double GammaHVV(double MH, double MV1, double MV2, GMModel &Mod, SFunc S, SFunc Stilde, double eta);
-
-double GammaHVV_VEGAS(double *Q2, size_t dim, void * modparams);
-
-double GammaHHV(double MH1, double MH2, double MV, double Coupling);
-
-double GammaHHV_VEGAS(double *Q2, size_t dim, void * modparams);
-
-// Following are the functions that will be used in Numerical integral 
-
-double Rho(double Q, double M, double Gamma);
-
-double Q(double rho, double M, double Gamma);
-
-double BW(double Q2, double M, double Gamma);
-
-// Following are the functions for the evaluation of off-shell decays
-
-// This one uses naive grid/box approximation to perform the integral over the two off-shell resonance
-double GammaHVVOFF(double MH, double MV1, double GA1, double MV2, double GA2, GMModel &Mod, SFunc S, SFunc Stilde, double eta);
-
-// This is the same as above but for one of the final state is gamma
-double GammaHVAOFF(double MH, double MV1, double GA1, GMModel &Mod, SFunc S, SFunc Stilde, double eta);
-
-// This one uses VEGAS algorithm to perform the integral
-double GammaHVVOFF_VEGAS(double MH, double MV1, double GA1, double MV2, double GA2, GMModel &Mod, SFunc FS, SFunc FStilde, double eta);
+    Q2VEGAS = 0,
+    Q2MISER = 1,
+    RHOVEGAS = 2,
+    RHOMISER = 3,
+    NONE = 4
+};
 
 #define NChannel 32
 class GMDecay
@@ -72,6 +25,7 @@ public:
 
     void SetModel(GMModel Mod);
     void SetModel(double MH, double MH3, double MH5, double M2);
+    void SetIntegralMethod(INTEGRALFLAGS flag);
     double GetGammaHPartial(PID Mother, PID P1, PID P2);
     double GetGammaHtot(PID Mother);
 
@@ -79,6 +33,7 @@ public:
     double GetGammaHtotEFT(PID Mother);
 private: 
     GMModel _Mod;
+    INTEGRALFLAGS _flag;
     void ResettingGammas();
     double GammaHPartial[NChannel];
     double GammaHPartialEFT[NChannel];
